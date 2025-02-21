@@ -15,11 +15,7 @@
     ]
   },
   "mixins": [
-    "playertrackercompass.mixins.json",
-    {
-      "config": "playertrackercompass.client.mixins.json",
-      "environment": "client"
-    }
+    "playertrackercompass.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=${loader_version}",
