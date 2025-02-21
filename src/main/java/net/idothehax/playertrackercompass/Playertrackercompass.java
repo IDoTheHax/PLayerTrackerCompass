@@ -38,7 +38,7 @@ public class Playertrackercompass implements ModInitializer {
     public static final String MOD_ID = "playertrackercompass";
     private static final Map<UUID, UUID> TRACKED_PLAYERS = new HashMap<>();
     // Create the item
-    public static final TrackingCompass TRACKING_COMPASS = new TrackingCompass(new Item.Settings(), Items.COMPASS);
+    public static final TrackingCompass TRACKING_COMPASS = new TrackingCompass(new Item.Settings().fireproof().maxCount(1), Items.COMPASS);
 
     @Override
     public void onInitialize() {
@@ -101,9 +101,6 @@ public class Playertrackercompass implements ModInitializer {
         // Create the tracking component
         GlobalPos targetPos = GlobalPos.create(target.getWorld().getRegistryKey(), target.getBlockPos());
         LodestoneTrackerComponent tracker = new LodestoneTrackerComponent(Optional.of(targetPos), true);
-
-        // Create a new component map
-        ComponentMap existingComponents = compass.getComponents();
 
         // Apply the component map back to the compass
         compass.set(DataComponentTypes.LODESTONE_TRACKER, tracker);
