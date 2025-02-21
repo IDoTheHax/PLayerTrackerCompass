@@ -5,11 +5,15 @@ import eu.pb4.polymer.core.api.item.PolymerItem;
 import eu.pb4.polymer.core.api.item.SimplePolymerItem;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.command.argument.EntityArgumentType;
 import net.minecraft.component.ComponentMap;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.LodestoneTrackerComponent;
+import net.minecraft.entity.ItemEntity;
+import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -56,6 +60,33 @@ public class Playertrackercompass implements ModInitializer {
             if (!player.getInventory().contains(new ItemStack(TRACKING_COMPASS))) {
                 ItemStack stack = new ItemStack(TRACKING_COMPASS);
                 player.getInventory().insertStack(stack);
+            }
+        });
+
+        ServerPlayerEvents.AFTER_RESPAWN.register((oldPlayer, newPlayer, alive) -> {
+            // Check if the player had a tracking compass
+            boolean hadCompass = false;
+            for (int i = 0; i < oldPlayer.getInventory().size(); i++) {
+                if (oldPlayer.getInventory().getStack(i).getItem() == TRACKING_COMPASS) {
+                    hadCompass = true;
+                    break;
+                }
+            }
+
+            // If they had a compass but don't anymore, give them a new one
+            if (hadCompass) {
+                boolean hasCompass = false;
+                for (int i = 0; i < newPlayer.getInventory().size(); i++) {
+                    if (newPlayer.getInventory().getStack(i).getItem() == TRACKING_COMPASS) {
+                        hasCompass = true;
+                        break;
+                    }
+                }
+
+                if (!hasCompass) {
+                    ItemStack stack = new ItemStack(TRACKING_COMPASS);
+                    newPlayer.getInventory().insertStack(stack);
+                }
             }
         });
     }
