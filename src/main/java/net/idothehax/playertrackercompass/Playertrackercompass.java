@@ -3,7 +3,6 @@ package net.idothehax.playertrackercompass;
 import com.mojang.brigadier.CommandDispatcher;
 import eu.pb4.polymer.core.api.item.PolymerItem;
 import eu.pb4.polymer.core.api.item.SimplePolymerItem;
-import eu.pb4.polymer.resourcepack.api.PolymerResourcePackUtils;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
@@ -47,8 +46,6 @@ public class Playertrackercompass implements ModInitializer {
 
     @Override
     public void onInitialize() {
-        LOGGER.info("Initializing Player Tracker Compass");
-
         // Register the compass item
         Registry.register(Registries.ITEM, Identifier.of(MOD_ID, "tracking_compass"), TRACKING_COMPASS);
 
@@ -92,9 +89,6 @@ public class Playertrackercompass implements ModInitializer {
                 }
             }
         });
-
-        PolymerResourcePackUtils.addModAssets("playertrackercompass");
-        PolymerResourcePackUtils.markAsRequired();
     }
 
     public static void registerCommands(CommandDispatcher<ServerCommandSource> dispatcher) {
@@ -122,34 +116,17 @@ public class Playertrackercompass implements ModInitializer {
         return 1;
     }
 
-    private static boolean isUpdating = false;
-    private static void updatePlayersCompass(ServerPlayerEntity player) {
-        // Prevent recursion
-        if (isUpdating) {
-            return;
-        }
+    private static void updatePlayersCompass(ServerPlayerEntity targetPlayer) {
+        MinecraftServer server = targetPlayer.getServer();
+        if (server == null) return;
 
-        isUpdating = true;
-
-        // Update the player's compass (existing logic)
-        for (int i = 0; i < player.getInventory().size(); i++) {
-            ItemStack stack = player.getInventory().getStack(i);
-            if (stack.getItem() == TRACKING_COMPASS) {
-                UUID targetUuid = TRACKED_PLAYERS.get(player.getUuid());
-                if (targetUuid != null) {
-                    ServerPlayerEntity targetPlayer = player.getServer().getPlayerManager().getPlayer(targetUuid);
-                    if (targetPlayer != null) {
-                        // Update the compass to point to the target player
-                        updateCompassTarget(stack, targetPlayer);
-                    }
-                }
-                break;
+        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+            UUID trackedTarget = TRACKED_PLAYERS.get(player.getUuid());
+            if (trackedTarget != null && trackedTarget.equals(targetPlayer.getUuid())) {
+                updatePlayersCompass(player);
             }
         }
-
-        isUpdating = false;
     }
-
 
     private static void updateCompassTarget(ItemStack compass, ServerPlayerEntity target) {
         // Create the tracking component
