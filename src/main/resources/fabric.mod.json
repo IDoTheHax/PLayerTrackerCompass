@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "playertrackercompass",
+  "version": "${version}",
+  "name": "PlayerTrackerCompass",
+  "description": "A Server side mod that allows you to track a player with a compass",
+  "authors": [],
+  "contact": {},
+  "license": "GPL-3.0",
+  "icon": "assets/playertrackercompass/icon.png",
+  "environment": "server",
+  "entrypoints": {
+    "main": [
+      "net.idothehax.playertrackercompass.Playertrackercompass"
+    ]
+  },
+  "mixins": [
+    "playertrackercompass.mixins.json",
+    {
+      "config": "playertrackercompass.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}
