@@ -7,6 +7,7 @@ import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.command.argument.EntityArgumentType;
 import net.minecraft.component.ComponentMap;
@@ -41,6 +42,8 @@ public class Playertrackercompass implements ModInitializer {
     public static final Logger LOGGER = LogManager.getLogger();
     public static final String MOD_ID = "playertrackercompass";
     private static final Map<UUID, UUID> TRACKED_PLAYERS = new HashMap<>();
+    private static ServerPlayerEntity target;
+
     // Create the item
     public static final TrackingCompass TRACKING_COMPASS = new TrackingCompass(new Item.Settings().fireproof().maxCount(1), Items.COMPASS);
 
@@ -57,9 +60,16 @@ public class Playertrackercompass implements ModInitializer {
         // On player join
         ServerPlayConnectionEvents.JOIN.register((handler,sender, server) -> {
             ServerPlayerEntity player = handler.getPlayer();
-            if (!player.getInventory().contains(new ItemStack(TRACKING_COMPASS))) {
-                ItemStack stack = new ItemStack(TRACKING_COMPASS);
-                player.getInventory().insertStack(stack);
+            for (int i = 0; i < player.getInventory().size(); i++) {
+                if (!(player.getInventory().getStack(i).getItem() == TRACKING_COMPASS)) {
+                    ItemStack stack = new ItemStack(TRACKING_COMPASS);
+                    player.getInventory().insertStack(stack);
+                    if (target != null) {
+                        updatePlayersCompass(target, target.getUuid());
+                    } else {
+                        return;
+                    }
+                }
             }
         });
 
@@ -69,6 +79,7 @@ public class Playertrackercompass implements ModInitializer {
             for (int i = 0; i < oldPlayer.getInventory().size(); i++) {
                 if (oldPlayer.getInventory().getStack(i).getItem() == TRACKING_COMPASS) {
                     hadCompass = true;
+                    updateCompassTarget(oldPlayer.getInventory().getStack(i), target);
                     break;
                 }
             }
@@ -79,12 +90,14 @@ public class Playertrackercompass implements ModInitializer {
                 for (int i = 0; i < newPlayer.getInventory().size(); i++) {
                     if (newPlayer.getInventory().getStack(i).getItem() == TRACKING_COMPASS) {
                         hasCompass = true;
+                        updateCompassTarget(oldPlayer.getInventory().getStack(i), target);
                         break;
                     }
                 }
 
                 if (!hasCompass) {
                     ItemStack stack = new ItemStack(TRACKING_COMPASS);
+                    updateCompassTarget(stack, target);
                     newPlayer.getInventory().insertStack(stack);
                 }
             }
@@ -110,26 +123,37 @@ public class Playertrackercompass implements ModInitializer {
             return 0;
         }
 
-        TRACKED_PLAYERS.put(tracker.getUuid(), targetPlayer.getUuid());
-        updatePlayersCompass(tracker);
+        target = targetPlayer;
+        updatePlayersCompass(targetPlayer, targetPlayer.getUuid());
         context.sendFeedback(() -> Text.literal("Now tracking player: " + targetPlayer.getName().getString()).setStyle(Style.EMPTY.withColor(Colors.LIGHT_RED)), true);
         return 1;
     }
 
-    private static void updatePlayersCompass(ServerPlayerEntity targetPlayer) {
+    private static void updatePlayersCompass(ServerPlayerEntity targetPlayer, UUID targetUUID) {
         MinecraftServer server = targetPlayer.getServer();
         if (server == null) return;
 
         for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-            UUID trackedTarget = TRACKED_PLAYERS.get(player.getUuid());
-            if (trackedTarget != null && trackedTarget.equals(targetPlayer.getUuid())) {
-                updatePlayersCompass(player);
+            TRACKED_PLAYERS.put(player.getUuid(), targetUUID);
+            for (int i = 0; i < player.getInventory().size(); i++) {
+                ItemStack stack = player.getInventory().getStack(i);
+                if (stack.getItem() == TRACKING_COMPASS) {
+                    updateCompassTarget(stack, targetPlayer);  // Update compass target
+                        stack.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Tracking: " + targetPlayer.getName().getString())
+                                .setStyle(Style.EMPTY.withColor(Colors.LIGHT_RED).withBold(true)));  // Update compass name
+                }
+                break;
             }
         }
     }
 
     private static void updateCompassTarget(ItemStack compass, ServerPlayerEntity target) {
-        // Create the tracking component
+        ComponentMap.Builder builder = ComponentMap.builder();
+
+        // Add all existing components from the compass
+        builder.addAll(compass.getComponents());
+
+        // Create a GlobalPos for the target player's current position
         GlobalPos targetPos = GlobalPos.create(target.getWorld().getRegistryKey(), target.getBlockPos());
         LodestoneTrackerComponent tracker = new LodestoneTrackerComponent(Optional.of(targetPos), true);
 
@@ -155,7 +179,7 @@ public class Playertrackercompass implements ModInitializer {
                     ServerPlayerEntity targetPlayer = serverPlayer.getServer().getPlayerManager().getPlayer(targetUuid);
                     if (targetPlayer != null) {
                         updateCompassTarget(user.getStackInHand(hand), targetPlayer);
-                        user.sendMessage(Text.literal("Tracking updated to: " + targetPlayer.getName().getString()), true);
+                        user.sendMessage(Text.literal("Tracking Pos Updated For: " + targetPlayer.getName().getString()), true);
                     } else {
                         user.sendMessage(Text.literal("Target player is offline.").setStyle(Style.EMPTY.withColor(Colors.RED)), true);
                     }
