@@ -143,13 +143,15 @@ public class Playertrackercompass implements ModInitializer {
 
     public static void registerCommands(CommandDispatcher<ServerCommandSource> dispatcher) {
         dispatcher.register(CommandManager.literal("trackercompass")
-                .requires(source -> source.hasPermissionLevel(4)) // Require OP level 4
+                .requires(source -> source.hasPermissionLevel(4))
                 .then(CommandManager.argument("player", EntityArgumentType.player())
                         .executes(context -> setupTrackingCompass(
                                 context.getSource(),
                                 EntityArgumentType.getPlayer(context, "player")
                         ))
                 )
+                .then(CommandManager.literal("stop")
+                        .executes(context -> stopTrackingCompass(context.getSource())))
         );
     }
 
@@ -166,22 +168,70 @@ public class Playertrackercompass implements ModInitializer {
         return 1;
     }
 
+    private static void removeCompassesFromPlayer(ServerPlayerEntity player) {
+        for (int i = 0; i < player.getInventory().size(); i++) {
+            ItemStack stack = player.getInventory().getStack(i);
+            if (stack.getItem() == TRACKING_COMPASS) {
+                player.getInventory().setStack(i, ItemStack.EMPTY);
+            }
+        }
+    }
+
     private static void updatePlayersCompass(ServerPlayerEntity targetPlayer, UUID targetUUID) {
         MinecraftServer server = targetPlayer.getServer();
         if (server == null) return;
 
+        // Remove compasses from the target player
+        removeCompassesFromPlayer(targetPlayer);
+
+        // Update compasses for all other players
         for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+            // Skip the target player
+            if (player == targetPlayer) {
+                continue;
+            }
+
             TRACKED_PLAYERS.put(player.getUuid(), targetUUID);
             for (int i = 0; i < player.getInventory().size(); i++) {
                 ItemStack stack = player.getInventory().getStack(i);
                 if (stack.getItem() == TRACKING_COMPASS) {
-                    updateCompassTarget(stack, targetPlayer);  // Update compass target
+                    updateCompassTarget(stack, targetPlayer);
                     stack.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Tracking: " + targetPlayer.getName().getString())
-                            .setStyle(Style.EMPTY.withColor(Colors.LIGHT_RED).withBold(true)));  // Update compass name
+                            .setStyle(Style.EMPTY.withColor(Colors.LIGHT_RED).withBold(true)));
                     break;
                 }
             }
         }
+    }
+
+    private static int stopTrackingCompass(ServerCommandSource context) {
+        if (!(context.getEntity() instanceof ServerPlayerEntity tracker)) {
+            context.sendError(Text.literal("This command can only be used by a player."));
+            return 0;
+        }
+
+        target = null;
+        TRACKED_PLAYERS.clear();
+
+        // Clear compass tracking for all players
+        MinecraftServer server = context.getServer();
+        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+            for (int i = 0; i < player.getInventory().size(); i++) {
+                ItemStack stack = player.getInventory().getStack(i);
+                if (stack.getItem() == TRACKING_COMPASS) {
+                    // Reset compass name
+                    stack.set(DataComponentTypes.CUSTOM_NAME,
+                            Text.literal("Tracking Compass")
+                                    .setStyle(Style.EMPTY.withColor(Colors.WHITE)));
+                    // Clear lodestone tracker
+                    stack.remove(DataComponentTypes.LODESTONE_TRACKER);
+                }
+            }
+        }
+
+        context.sendFeedback(() -> Text.literal("Stopped tracking")
+                .setStyle(Style.EMPTY.withColor(Colors.LIGHT_RED)), true);
+        return 1;
     }
 
     private static void updateCompassTarget(ItemStack compass, ServerPlayerEntity target) {
