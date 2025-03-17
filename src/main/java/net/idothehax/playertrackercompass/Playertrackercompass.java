@@ -6,15 +6,12 @@ import eu.pb4.polymer.core.api.item.SimplePolymerItem;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.command.argument.EntityArgumentType;
 import net.minecraft.component.ComponentMap;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.LodestoneTrackerComponent;
-import net.minecraft.entity.ItemEntity;
-import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -44,6 +41,10 @@ public class Playertrackercompass implements ModInitializer {
     private static final Map<UUID, UUID> TRACKED_PLAYERS = new HashMap<>();
     private static ServerPlayerEntity target;
 
+    // Tick counter for periodic updates
+    private static int tickCounter = 0;
+    private static final int UPDATE_INTERVAL = 200; // 10 seconds (20 ticks per second)
+
     // Create the item
     public static final TrackingCompass TRACKING_COMPASS = new TrackingCompass(new Item.Settings().fireproof().maxCount(1), Items.COMPASS);
 
@@ -57,18 +58,26 @@ public class Playertrackercompass implements ModInitializer {
             registerCommands(dispatcher);
         });
 
+        // Register server tick event for periodic updates
+        ServerTickEvents.END_SERVER_TICK.register(this::onServerTick);
+
         // On player join
-        ServerPlayConnectionEvents.JOIN.register((handler,sender, server) -> {
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
             ServerPlayerEntity player = handler.getPlayer();
+            boolean hasCompass = false;
+
             for (int i = 0; i < player.getInventory().size(); i++) {
-                if (!(player.getInventory().getStack(i).getItem() == TRACKING_COMPASS)) {
-                    ItemStack stack = new ItemStack(TRACKING_COMPASS);
-                    player.getInventory().insertStack(stack);
-                    if (target != null) {
-                        updatePlayersCompass(target, target.getUuid());
-                    } else {
-                        return;
-                    }
+                if (player.getInventory().getStack(i).getItem() == TRACKING_COMPASS) {
+                    hasCompass = true;
+                    break;
+                }
+            }
+
+            if (!hasCompass) {
+                ItemStack stack = new ItemStack(TRACKING_COMPASS);
+                player.getInventory().insertStack(stack);
+                if (target != null) {
+                    updateCompassTarget(stack, target);
                 }
             }
         });
@@ -79,7 +88,6 @@ public class Playertrackercompass implements ModInitializer {
             for (int i = 0; i < oldPlayer.getInventory().size(); i++) {
                 if (oldPlayer.getInventory().getStack(i).getItem() == TRACKING_COMPASS) {
                     hadCompass = true;
-                    updateCompassTarget(oldPlayer.getInventory().getStack(i), target);
                     break;
                 }
             }
@@ -90,18 +98,47 @@ public class Playertrackercompass implements ModInitializer {
                 for (int i = 0; i < newPlayer.getInventory().size(); i++) {
                     if (newPlayer.getInventory().getStack(i).getItem() == TRACKING_COMPASS) {
                         hasCompass = true;
-                        updateCompassTarget(oldPlayer.getInventory().getStack(i), target);
+                        if (target != null) {
+                            updateCompassTarget(newPlayer.getInventory().getStack(i), target);
+                        }
                         break;
                     }
                 }
 
                 if (!hasCompass) {
                     ItemStack stack = new ItemStack(TRACKING_COMPASS);
-                    updateCompassTarget(stack, target);
+                    if (target != null) {
+                        updateCompassTarget(stack, target);
+                    }
                     newPlayer.getInventory().insertStack(stack);
                 }
             }
         });
+    }
+
+    private void onServerTick(MinecraftServer server) {
+        tickCounter++;
+
+        // Update compass every UPDATE_INTERVAL ticks
+        if (tickCounter >= UPDATE_INTERVAL) {
+            tickCounter = 0;
+
+            // Only update if there's a target
+            if (target != null && !target.isRemoved() && target.isAlive()) {
+                updateAllCompasses(server);
+            }
+        }
+    }
+
+    private void updateAllCompasses(MinecraftServer server) {
+        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+            for (int i = 0; i < player.getInventory().size(); i++) {
+                ItemStack stack = player.getInventory().getStack(i);
+                if (stack.getItem() == TRACKING_COMPASS) {
+                    updateCompassTarget(stack, target);
+                }
+            }
+        }
     }
 
     public static void registerCommands(CommandDispatcher<ServerCommandSource> dispatcher) {
@@ -139,10 +176,10 @@ public class Playertrackercompass implements ModInitializer {
                 ItemStack stack = player.getInventory().getStack(i);
                 if (stack.getItem() == TRACKING_COMPASS) {
                     updateCompassTarget(stack, targetPlayer);  // Update compass target
-                        stack.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Tracking: " + targetPlayer.getName().getString())
-                                .setStyle(Style.EMPTY.withColor(Colors.LIGHT_RED).withBold(true)));  // Update compass name
+                    stack.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Tracking: " + targetPlayer.getName().getString())
+                            .setStyle(Style.EMPTY.withColor(Colors.LIGHT_RED).withBold(true)));  // Update compass name
+                    break;
                 }
-                break;
             }
         }
     }
@@ -163,7 +200,7 @@ public class Playertrackercompass implements ModInitializer {
         // Set custom name using correct method
         compass.set(DataComponentTypes.CUSTOM_NAME,
                 Text.literal("Tracking: " + target.getName().getString())
-                .setStyle(Style.EMPTY.withColor(Colors.ALTERNATE_WHITE)));
+                        .setStyle(Style.EMPTY.withColor(Colors.ALTERNATE_WHITE)));
     }
 
     public static class TrackingCompass extends SimplePolymerItem implements PolymerItem {
