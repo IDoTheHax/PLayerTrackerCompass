@@ -27,12 +27,15 @@ jobs:
       - name: Publish Fabric Mod to Modrinth and GitHub
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          modrinth-id: KwrF4Ziw  # Replace with your actual Modrinth project ID
+          modrinth-id: 17qazj8P
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          files: fabric/build/libs/!(*-@(dev|sources)).jar
+          files: build/libs/!(*-@(dev|sources)).jar
           name: "Player Tracker Compass Fabric ${{ github.ref_name }}"
           version: ${{ github.ref_name }}
           changelog-file: README.md
-          loaders: ["fabric"]
-          game-versions: ["1.21.1", "1.21.2", "1.21.3", "1.21.4"]
+          loaders: fabric
+          game-versions: 1.21, 1.211
+          dependencies: |
+            fabric-api>=0.102.0+1.21
+            polymer>=0.9.9+1.21
