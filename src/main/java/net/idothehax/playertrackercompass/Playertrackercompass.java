@@ -64,8 +64,12 @@ public class Playertrackercompass implements ModInitializer {
         // On player join
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
             ServerPlayerEntity player = handler.getPlayer();
-            boolean hasCompass = false;
+            // Don't give compass to the tracked player
+            if (target != null && player.getUuid().equals(target.getUuid())) {
+                return;
+            }
 
+            boolean hasCompass = false;
             for (int i = 0; i < player.getInventory().size(); i++) {
                 if (player.getInventory().getStack(i).getItem() == TRACKING_COMPASS) {
                     hasCompass = true;
@@ -83,6 +87,11 @@ public class Playertrackercompass implements ModInitializer {
         });
 
         ServerPlayerEvents.AFTER_RESPAWN.register((oldPlayer, newPlayer, alive) -> {
+            // Don't give compass to the tracked player
+            if (target != null && newPlayer.getUuid().equals(target.getUuid())) {
+                return;
+            }
+
             // Check if the player had a tracking compass
             boolean hadCompass = false;
             for (int i = 0; i < oldPlayer.getInventory().size(); i++) {
@@ -250,7 +259,7 @@ public class Playertrackercompass implements ModInitializer {
         // Set custom name using correct method
         compass.set(DataComponentTypes.CUSTOM_NAME,
                 Text.literal("Tracking: " + target.getName().getString())
-                        .setStyle(Style.EMPTY.withColor(Colors.ALTERNATE_WHITE)));
+                        .setStyle(Style.EMPTY.withColor(Colors.LIGHT_RED).withBold(true)));
     }
 
     public static class TrackingCompass extends SimplePolymerItem implements PolymerItem {

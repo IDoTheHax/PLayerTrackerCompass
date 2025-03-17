@@ -1,2 +1,1 @@
-- Remove the compass for the user beign tracked
-- Fix the player getting another compass when they join (they already have one)
+- 2 players tracked at the same time?
