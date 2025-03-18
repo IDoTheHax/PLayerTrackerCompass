@@ -35,7 +35,8 @@ jobs:
           version: ${{ github.ref_name }}
           changelog-file: README.md
           loaders: fabric
-          game-versions: 1.21, 1.21.1
+          game-versions: |
+            [1.21, 1.21.1)
           dependencies: |
             fabric-api>=0.102.0+1.21
           game-version-filter: releases
